@@ -1,4 +1,4 @@
-import { chromium, Browser, Page } from 'playwright';
+import { chromium, Browser } from 'playwright';
 import config from '../config';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -22,14 +22,14 @@ export interface PageResult {
 
 async function getBrowser(): Promise<Browser> {
   if (!browser) {
-    browser = await chromium.launch({ 
+    browser = await chromium.launch({
       headless: true,
       args: [
         '--disable-blink-features=AutomationControlled',
         '--disable-dev-shm-usage',
         '--no-sandbox',
         '--disable-setuid-sandbox',
-      ]
+      ],
     });
   }
   return browser;
@@ -48,46 +48,38 @@ export async function fetchPage(url: string): Promise<PageResult> {
     viewport: { width: 1920, height: 1080 },
     locale: 'ru-RU',
   });
-  const page = await context.newPage();
-  
-  // Anti-detection
-  await page.addInitScript(() => {
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-    Object.defineProperty(navigator, 'languages', { get: () => ['ru-RU', 'ru', 'en'] });
-  });
-  
-  await page.setExtraHTTPHeaders({
-    'User-Agent': config.userAgent,
-    'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
-  });
 
   try {
-    await page.goto(url, {
-      waitUntil: 'load',
-      timeout: config.timeout,
+    const page = await context.newPage();
+
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      Object.defineProperty(navigator, 'languages', { get: () => ['ru-RU', 'ru', 'en'] });
     });
 
-    // Wait for network to be idle (more reliable for SPAs)
+    await page.setExtraHTTPHeaders({
+      'User-Agent': config.userAgent,
+      'Accept-Language': 'ru-RU,ru;q=0.9,en;q=0.8',
+    });
+
+    await page.goto(url, { waitUntil: 'load', timeout: config.timeout });
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    
-    // Wait a bit more for React to render
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(config.waitAfterLoad);
 
     const html: string = await page.content();
-    
-    // Debug: save HTML
-    const domain = new URL(url).hostname.replace(/^www\./, '');
-    const debugDir = path.join(process.cwd(), 'debug');
-    await fs.mkdir(debugDir, { recursive: true });
-    await fs.writeFile(path.join(debugDir, `${domain}.html`), html);
 
-    // Get all images from the page
+    if (config.debug) {
+      const domain = new URL(url).hostname.replace(/^www\./, '');
+      const debugDir = path.join(process.cwd(), 'debug');
+      await fs.mkdir(debugDir, { recursive: true });
+      await fs.writeFile(path.join(debugDir, `${domain}.html`), html);
+    }
+
     const domCandidates: DomCandidate[] = await page.evaluate(() => {
       const candidates: DomCandidate[] = [];
       const seen = new Set<string>();
-      
-      // Get all images
+
       document.querySelectorAll('img').forEach((el: Element) => {
         const imgEl = el as HTMLImageElement;
         const src = imgEl.src || imgEl.getAttribute('srcset')?.split(' ')[0];
@@ -104,7 +96,6 @@ export async function fetchPage(url: string): Promise<PageResult> {
         }
       });
 
-      // Get all images inside header, nav, footer
       const containers = ['header', 'nav', 'footer', 'aside'];
       containers.forEach(container => {
         document.querySelectorAll(`${container} img`).forEach((el: Element) => {
@@ -123,19 +114,12 @@ export async function fetchPage(url: string): Promise<PageResult> {
           }
         });
       });
-      
+
       return candidates;
     });
 
-    await page.close();
-    
-    return {
-      html,
-      domCandidates,
-      url,
-    };
-  } catch (error) {
-    await page.close();
-    throw error;
+    return { html, domCandidates, url };
+  } finally {
+    await context.close();
   }
 }
