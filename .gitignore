@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+logos/
+logos.json
+debug/
+*.tsbuildinfo
