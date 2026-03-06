@@ -181,6 +181,7 @@ for (const r of results) {
 | Переменная | По умолчанию | Описание |
 |------------|-------------|----------|
 | `PORT` | `3000` | Порт HTTP-сервера |
+| `CORS_ORIGIN` | `*` | Разрешённый источник для CORS (`http://localhost:5173`) |
 | `DEBUG` | `false` | Сохранять HTML страниц в `debug/` для отладки |
 | `LOGOS_BASE_URL` | `/logos` | Базовый путь в `logoUrl` в ответе API |
 
@@ -240,6 +241,107 @@ developers_logo_parser/
 ├── logos.json         # Метаданные
 └── debug/             # HTML страниц (только при DEBUG=true)
 ```
+
+---
+
+## Интеграция в React-приложение
+
+Парсер — это **отдельный Node.js-сервис**. Его нельзя установить как npm-пакет в React — он использует Playwright и файловую систему, которые работают только на сервере. Правильная схема:
+
+```
+React app (браузер) → logo-parser сервис (отдельный процесс)
+```
+
+### Шаг 1 — Запустить logo-parser рядом с проектом
+
+В отдельном терминале из папки `developers_logo_parser`:
+
+```bash
+PORT=3010 CORS_ORIGIN=http://localhost:5173 npm run serve
+```
+
+`CORS_ORIGIN` — адрес React-приложения. Для разработки можно `*` чтобы разрешить все.
+
+### Шаг 2 — Вызвать из React
+
+```tsx
+// src/api/logoParser.ts
+const PARSER_URL = 'http://localhost:3010';
+
+export async function parseLogos(domains: string[]) {
+  const res = await fetch(`${PARSER_URL}/api/parse`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ urls: domains }),
+  });
+  if (!res.ok) throw new Error(`Parser error: ${res.status}`);
+  return res.json() as Promise<{
+    results: Array<{
+      domain: string;
+      status: 'success' | 'error';
+      logoUrl?: string;
+      format?: string;
+      width?: number | null;
+      height?: number | null;
+      error?: string;
+    }>;
+  }>;
+}
+```
+
+```tsx
+// Использование в компоненте
+import { parseLogos } from '../api/logoParser';
+
+const PARSER_URL = 'http://localhost:3010';
+
+function AdminPanel() {
+  const handleParseLogo = async () => {
+    const { results } = await parseLogos(['pik.ru', 'lsr.ru', 'samolet.ru']);
+
+    for (const r of results) {
+      if (r.status === 'success') {
+        // logoUrl это "/logos/pik.ru.png" — склеиваем с хостом парсера
+        const fullUrl = `${PARSER_URL}${r.logoUrl}`;
+        console.log(`${r.domain}: ${fullUrl}`);
+      }
+    }
+  };
+
+  return <button onClick={handleParseLogo}>Спарсить логотипы</button>;
+}
+```
+
+### Шаг 3 (продакшн) — Проксировать через свой бэкенд
+
+В продакшне браузер не должен обращаться к парсеру напрямую. Добавь прокси в свой бэкенд:
+
+**Next.js** (`app/api/parse-logos/route.ts`):
+```ts
+export async function POST(req: Request) {
+  const body = await req.json();
+  const res = await fetch('http://localhost:3010/api/parse', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return Response.json(await res.json());
+}
+```
+
+**Express**:
+```ts
+app.post('/api/parse-logos', async (req, res) => {
+  const response = await fetch('http://localhost:3010/api/parse', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req.body),
+  });
+  res.json(await response.json());
+});
+```
+
+Тогда из React вызываешь уже свой бэкенд (`/api/parse-logos`) — без CORS и без открытого порта парсера наружу.
 
 ---
 

@@ -1,9 +1,12 @@
 import express, { Request, Response } from 'express';
+import cors from 'cors';
 import * as path from 'path';
 import { parseLogos, closeBrowser } from './lib';
-import config from './config';
 
 const app = express();
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+}));
 app.use(express.json());
 
 // Serve saved logos as static files
