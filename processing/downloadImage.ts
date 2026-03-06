@@ -9,24 +9,18 @@ export interface DownloadResult {
 
 export async function downloadImage(url: string): Promise<DownloadResult> {
   try {
-    const headResponse = await axios.head(url, {
-      timeout: config.timeout,
-      validateStatus: () => true,
+    const response = await axios.get(url, {
+      timeout: config.imageTimeout,
+      responseType: 'arraybuffer',
+      validateStatus: (s: number) => s === 200,
+      headers: {
+        'User-Agent': config.userAgent,
+      },
     });
-    
-    const contentType = headResponse.headers['content-type'] || '';
+
+    const contentType = response.headers['content-type'] || '';
     if (!contentType.startsWith('image/')) {
       throw new Error(`Not an image: ${contentType}`);
-    }
-
-    const response = await axios.get(url, {
-      timeout: config.timeout,
-      responseType: 'arraybuffer',
-      validateStatus: () => true,
-    });
-
-    if (response.status !== 200) {
-      throw new Error(`Failed to download: ${response.status}`);
     }
 
     const buffer = Buffer.from(response.data);
