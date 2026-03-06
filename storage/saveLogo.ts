@@ -1,5 +1,6 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import config from '../config';
 
 export interface SaveResult {
   path: string;
@@ -18,6 +19,6 @@ export async function saveLogo(buffer: Buffer, domain: string, ext: string): Pro
   
   return {
     path: filepath,
-    url: `/logos/${filename}`,
+    url: `${config.logosBaseUrl}/${filename}`,
   };
 }
