@@ -8,32 +8,22 @@ export interface DownloadResult {
 }
 
 export async function downloadImage(url: string): Promise<DownloadResult> {
-  try {
-    const response = await axios.get(url, {
-      timeout: config.imageTimeout,
-      responseType: 'arraybuffer',
-      validateStatus: (s: number) => s === 200,
-      headers: {
-        'User-Agent': config.userAgent,
-      },
-    });
+  const response = await axios.get(url, {
+    timeout: config.imageTimeout,
+    responseType: 'arraybuffer',
+    validateStatus: (status) => status === 200,
+    headers: { 'User-Agent': config.userAgent },
+  });
 
-    const contentType = response.headers['content-type'] || '';
-    if (!contentType.startsWith('image/')) {
-      throw new Error(`Not an image: ${contentType}`);
-    }
-
-    const buffer = Buffer.from(response.data);
-    const ext = getExtension(url, contentType);
-
-    return {
-      buffer,
-      ext,
-      contentType,
-    };
-  } catch (error) {
-    throw new Error(`Download failed: ${(error as Error).message}`);
+  const contentType = (response.headers['content-type'] as string) || '';
+  if (!contentType.startsWith('image/')) {
+    throw new Error(`Not an image: ${contentType}`);
   }
+
+  const buffer = Buffer.from(response.data as ArrayBuffer);
+  const ext = getExtension(url, contentType);
+
+  return { buffer, ext, contentType };
 }
 
 function getExtension(url: string, contentType: string): string {
@@ -54,5 +44,5 @@ function getExtension(url: string, contentType: string): string {
     'image/vnd.microsoft.icon': 'ico',
   };
 
-  return mimeMap[contentType] || 'png';
+  return mimeMap[contentType.split(';')[0].trim()] || 'png';
 }
