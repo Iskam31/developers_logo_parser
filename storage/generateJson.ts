@@ -1,7 +1,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { Mutex } from 'async-mutex';
 
 const DB_PATH = path.join(process.cwd(), 'logos.json');
+const mutex = new Mutex();
 
 export interface LogoEntry {
   domain: string;
@@ -18,7 +20,7 @@ async function loadJsonDb(): Promise<LogoEntry[]> {
   try {
     const content = await fs.readFile(DB_PATH, 'utf-8');
     return JSON.parse(content);
-  } catch (e) {
+  } catch {
     return [];
   }
 }
@@ -28,15 +30,13 @@ async function saveJsonDb(data: LogoEntry[]): Promise<void> {
 }
 
 export async function updateLogoEntry(entry: LogoEntry): Promise<LogoEntry[]> {
-  const db = await loadJsonDb();
-  
-  const filtered = db.filter(item => item.domain !== entry.domain);
-  
-  filtered.push(entry);
-  
-  await saveJsonDb(filtered);
-  
-  return filtered;
+  return mutex.runExclusive(async () => {
+    const db = await loadJsonDb();
+    const filtered = db.filter(item => item.domain !== entry.domain);
+    filtered.push(entry);
+    await saveJsonDb(filtered);
+    return filtered;
+  });
 }
 
 export async function getLogoEntry(domain: string): Promise<LogoEntry | undefined> {
