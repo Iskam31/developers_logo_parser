@@ -49,7 +49,7 @@ function scoreCandidate(candidate: Candidate): { score: number; reasons: string[
     // Check if square
     if (isSquare(w, h)) {
       square = true;
-      score += 15;
+      score += config.scoring.squareFormat;
       reasons.push('square format (good for circular)');
     }
   }
