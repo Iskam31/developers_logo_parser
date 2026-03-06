@@ -1,8 +1,8 @@
 # developers_logo_parser
 
-A service for parsing company logos from their websites.
+Сервис для парсинга логотипов компаний с их сайтов.
 
-## Running as HTTP service
+## Запуск как HTTP-сервис (для интеграции с админкой)
 
 ```bash
 npm install
@@ -10,13 +10,13 @@ npx playwright install chromium
 npm run serve
 ```
 
-Server starts on `http://localhost:3000` (change port via `PORT=XXXX`).
+Сервер стартует на `http://localhost:3000` (порт меняется через переменную окружения `PORT`).
 
-### API
+## API
 
-#### POST /api/parse
+### POST /api/parse
 
-Accepts a list of URLs, returns found logos.
+Принимает список URL, возвращает найденные логотипы.
 
 ```bash
 curl -X POST http://localhost:3000/api/parse \
@@ -24,7 +24,7 @@ curl -X POST http://localhost:3000/api/parse \
   -d '{"urls": ["https://pik.ru/", "https://google.com/"]}'
 ```
 
-Response:
+Ответ:
 ```json
 {
   "results": [
@@ -46,26 +46,30 @@ Response:
 }
 ```
 
-#### GET /api/health
+### GET /api/health
 
-Health check endpoint.
+Проверка доступности сервиса.
 
-### Configuration (environment variables)
+```bash
+curl http://localhost:3000/api/health
+```
 
-| Variable         | Default  | Description                           |
-|------------------|----------|---------------------------------------|
-| `PORT`           | `3000`   | HTTP server port                      |
-| `DEBUG`          | `false`  | Save fetched HTML to `debug/`         |
-| `LOGOS_BASE_URL` | `/logos`  | Base URL for serving logos             |
-
-## CLI (local usage)
+## CLI (локальный запуск)
 
 ```bash
 npm start https://pik.ru/ https://google.com/
 ```
 
-## File structure
+## Конфигурация (переменные окружения)
 
-- `logos/` -- saved logos (PNG/SVG/etc)
-- `logos.json` -- metadata
-- `debug/` -- page HTML (only when `DEBUG=true`)
+| Переменная       | По умолчанию | Описание                              |
+|------------------|-------------|---------------------------------------|
+| `PORT`           | `3000`      | Порт HTTP-сервера                     |
+| `DEBUG`          | `false`     | Сохранять HTML страниц в `debug/`     |
+| `LOGOS_BASE_URL` | `/logos`    | Базовый URL для отдачи логотипов      |
+
+## Структура файлов
+
+- `logos/` — сохранённые логотипы (PNG/SVG/WebP/etc)
+- `logos.json` — метаданные всех спарсенных логотипов
+- `debug/` — HTML страниц (только при `DEBUG=true`)
