@@ -1,9 +1,8 @@
-import * as cheerio from 'cheerio';
+import type { CheerioAPI } from 'cheerio';
 import axios from 'axios';
 import { resolveUrl, Candidate } from './htmlExtractor';
 
-export async function extractFromCss(html: string, baseUrl: string): Promise<Candidate[]> {
-  const $ = cheerio.load(html);
+export async function extractFromCss($: CheerioAPI, baseUrl: string): Promise<Candidate[]> {
   const candidates: Candidate[] = [];
   const seen = new Set<string>();
 

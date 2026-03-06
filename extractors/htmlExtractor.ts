@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import type { CheerioAPI } from 'cheerio';
 
 export interface Candidate {
   url: string | null;
@@ -21,8 +22,11 @@ export function resolveUrl(base: string, relative: string): string | null {
   }
 }
 
-export function extractFromHtml(html: string, baseUrl: string): Candidate[] {
-  const $ = cheerio.load(html);
+export function loadHtml(html: string): CheerioAPI {
+  return cheerio.load(html);
+}
+
+export function extractFromHtml($: CheerioAPI, baseUrl: string): Candidate[] {
   const candidates: Candidate[] = [];
   const seen = new Set<string>();
 
@@ -39,11 +43,7 @@ export function extractFromHtml(html: string, baseUrl: string): Candidate[] {
         const resolved = resolveUrl(baseUrl, content);
         if (resolved && !seen.has(resolved)) {
           seen.add(resolved);
-          candidates.push({
-            url: resolved,
-            source: 'meta',
-            type: 'image',
-          });
+          candidates.push({ url: resolved, source: 'meta', type: 'image' });
         }
       }
     });
@@ -52,7 +52,7 @@ export function extractFromHtml(html: string, baseUrl: string): Candidate[] {
   $('script[type="application/ld+json"]').each((_, el) => {
     try {
       const json = JSON.parse($(el).html() || '');
-      
+
       const findLogo = (obj: unknown): string | null => {
         if (!obj) return null;
         if (typeof obj === 'string') return obj;
@@ -68,24 +68,18 @@ export function extractFromHtml(html: string, baseUrl: string): Candidate[] {
           if (typeof o.logo === 'object' && o.logo !== null) {
             const logoObj = o.logo as Record<string, unknown>;
             if (typeof logoObj.url === 'string') return logoObj.url;
-            if (Array.isArray(logoObj)) {
-              return findLogo(logoObj);
-            }
+            if (Array.isArray(logoObj)) return findLogo(logoObj);
           }
         }
         return null;
       };
-      
+
       const logoUrl = findLogo(json);
       if (logoUrl) {
         const resolved = resolveUrl(baseUrl, logoUrl);
         if (resolved && !seen.has(resolved)) {
           seen.add(resolved);
-          candidates.push({
-            url: resolved,
-            source: 'schema',
-            type: 'image',
-          });
+          candidates.push({ url: resolved, source: 'schema', type: 'image' });
         }
       }
     } catch (e) {}
@@ -131,17 +125,13 @@ export function extractFromHtml(html: string, baseUrl: string): Candidate[] {
 
   svgSelectors.forEach(selector => {
     $(selector).each((_, el) => {
-      const viewBox = $(el).attr('viewBox') || '';
-      const width = $(el).attr('width') || '';
-      const height = $(el).attr('height') || '';
-      
       candidates.push({
         url: null,
         source: 'html-svg',
         type: 'svg-inline',
-        viewBox,
-        width,
-        height,
+        viewBox: $(el).attr('viewBox') || '',
+        width: $(el).attr('width') || '',
+        height: $(el).attr('height') || '',
         className: $(el).attr('class') || '',
         id: $(el).attr('id') || '',
         outerHtml: $.html(el),
@@ -156,12 +146,7 @@ export function extractFromHtml(html: string, baseUrl: string): Candidate[] {
       const resolved = resolveUrl(baseUrl, href);
       if (resolved && !seen.has(resolved)) {
         seen.add(resolved);
-        candidates.push({
-          url: resolved,
-          source: 'favicon',
-          type: 'image',
-          className: sizes,
-        });
+        candidates.push({ url: resolved, source: 'favicon', type: 'image', className: sizes });
       }
     }
   });
@@ -169,9 +154,7 @@ export function extractFromHtml(html: string, baseUrl: string): Candidate[] {
   return candidates;
 }
 
-export function extractFavicon(html: string, baseUrl: string): Candidate | null {
-  const $ = cheerio.load(html);
-  
+export function extractFavicon($: CheerioAPI, baseUrl: string): Candidate | null {
   const selectors = [
     'link[rel="icon"]',
     'link[rel="shortcut icon"]',
@@ -184,21 +167,15 @@ export function extractFavicon(html: string, baseUrl: string): Candidate | null 
 
   for (const selector of selectors) {
     let content: string | undefined;
-    
     if (selector.startsWith('meta')) {
       content = $(selector).attr('content');
     } else {
       content = $(selector).attr('href');
     }
-    
     if (content) {
       const resolved = resolveUrl(baseUrl, content);
       if (resolved) {
-        return {
-          url: resolved,
-          source: 'favicon',
-          type: 'image',
-        };
+        return { url: resolved, source: 'favicon', type: 'image' };
       }
     }
   }
@@ -206,12 +183,10 @@ export function extractFavicon(html: string, baseUrl: string): Candidate | null 
   return null;
 }
 
-export function extractLargeIcons(html: string, baseUrl: string): Candidate[] {
-  const $ = cheerio.load(html);
+export function extractLargeIcons($: CheerioAPI, baseUrl: string): Candidate[] {
   const candidates: Candidate[] = [];
   const seen = new Set<string>();
 
-  // Look for larger icons (apple-touch-icon, mask-icon with sizes)
   const selectors = [
     'link[rel="apple-touch-icon"]',
     'link[rel="apple-touch-icon-precomposed"]',
@@ -226,17 +201,11 @@ export function extractLargeIcons(html: string, baseUrl: string): Candidate[] {
     $(selector).each((_, el) => {
       const href = $(el).attr('href') || $(el).attr('content');
       const sizes = $(el).attr('sizes') || '';
-      
       if (href) {
         const resolved = resolveUrl(baseUrl, href);
         if (resolved && !seen.has(resolved)) {
           seen.add(resolved);
-          candidates.push({
-            url: resolved,
-            source: 'large-icon',
-            type: 'image',
-            className: sizes,
-          });
+          candidates.push({ url: resolved, source: 'large-icon', type: 'image', className: sizes });
         }
       }
     });

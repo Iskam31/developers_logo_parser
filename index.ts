@@ -1,6 +1,6 @@
 import { fetchPage, closeBrowser } from './crawler/browser';
 import { checkRobotsTxt } from './crawler/robotsTxt';
-import { extractFromHtml, extractFavicon, extractLargeIcons, Candidate } from './extractors/htmlExtractor';
+import { loadHtml, extractFromHtml, extractFavicon, extractLargeIcons, Candidate } from './extractors/htmlExtractor';
 import { extractFromCss } from './extractors/cssExtractor';
 import { selectBestCandidate, ScoredCandidate } from './scoring/logoScoring';
 import { downloadImage, DownloadResult } from './processing/downloadImage';
@@ -45,9 +45,12 @@ async function parseLogo(url: string): Promise<LogoEntry | null> {
     return null;
   }
 
+  // Parse HTML once and share cheerio instance
+  const $ = loadHtml(pageResult.html);
+
   // Extract candidates
-  const htmlCandidates: Candidate[] = extractFromHtml(pageResult.html, url);
-  const cssCandidates: Candidate[] = await extractFromCss(pageResult.html, url);
+  const htmlCandidates: Candidate[] = extractFromHtml($, url);
+  const cssCandidates: Candidate[] = await extractFromCss($, url);
   
   // Add DOM candidates
   const domCandidates: Candidate[] = pageResult.domCandidates.map((dc: DomCandidate) => ({
@@ -68,7 +71,7 @@ async function parseLogo(url: string): Promise<LogoEntry | null> {
   let best: ScoredCandidate | null = null;
   let downloadedBest: DownloadResult | null = null;
   
-  const largeIcons = extractLargeIcons(pageResult.html, url);
+  const largeIcons = extractLargeIcons($, url);
   if (largeIcons.length > 0) {
     console.log(`[INFO] Found ${largeIcons.length} large icon(s)`);
     // Try each large icon until we find one with good size
@@ -104,7 +107,7 @@ async function parseLogo(url: string): Promise<LogoEntry | null> {
   // Priority 2: Try favicon if no large icon found or too small
   if (!best || !downloadedBest) {
     console.log(`[INFO] Trying favicon...`);
-    const favicon = extractFavicon(pageResult.html, url);
+    const favicon = extractFavicon($, url);
     
     if (favicon && favicon.url) {
       try {
